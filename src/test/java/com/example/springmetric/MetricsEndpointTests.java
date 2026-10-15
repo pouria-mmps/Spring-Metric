@@ -16,6 +16,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MetricsEndpointTests {
 
 	@Test
+	void scrape_whenRequestCompletes_exposesBoundedDurationBuckets(@Autowired MockMvc mockMvc) throws Exception {
+		mockMvc.perform(get("/api/hello")).andExpect(status().isOk());
+		String scrape = mockMvc.perform(get("/actuator/prometheus"))
+				.andExpect(status().isOk())
+				.andReturn().getResponse().getContentAsString();
+
+		assertThat(scrape.lines().filter(line -> line.startsWith("http_server_requests_seconds_bucket{")
+				&& line.contains("uri=\"/api/hello\"")))
+				.anySatisfy(line -> assertThat(line).contains("le=\"0.001\""))
+				.anySatisfy(line -> assertThat(line).contains("le=\"5.0\""))
+				.anySatisfy(line -> assertThat(line).contains("le=\"+Inf\""));
+		assertThat(scrape).doesNotContain("http_server_requests_active_seconds_bucket");
+	}
+
+	@Test
 	void scrape_whenApplicationIsRunning_exposesRuntimeAndHttpMetrics(@Autowired MockMvc mockMvc) throws Exception {
 		mockMvc.perform(get("/api/hello")).andExpect(status().isOk());
 

@@ -50,8 +50,8 @@ Invoke-RestMethod http://localhost:8080/api/hello
 
 Actuator and Micrometer expose JVM memory, garbage collection, threads, process CPU,
 uptime, disk space, and HTTP request counts and durations. HTTP series appear after
-requests are handled. No database, Kafka, custom business metrics, or latency
-histograms are configured in this stage; p99 requires histogram configuration later.
+requests are handled. Completed HTTP request duration histograms are enabled for
+endpoint p99 estimates. Database, Kafka, and custom business metrics are not yet configured.
 
 Metrics are aggregated in memory and exported when Prometheus scrapes the app.
 There is no outbound monitoring call on the request path. Instrumentation and
@@ -92,14 +92,100 @@ Useful PromQL examples (duration units are seconds):
 # Requests per second by endpoint, excluding management traffic
 sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m]))
 
-# HTTP 5xx responses per second
-sum(rate(http_server_requests_seconds_count{application="SpringMetric",status=~"5..",uri!~"/actuator.*"}[5m]))
+# Server error fraction per endpoint (Grafana displays this as a percentage)
+(
+  sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",status=~"5..",uri!~"/actuator.*"}[5m]))
+  or on (uri, method)
+  (0 * sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m])))
+)
+/
+sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m]))
 
 # Average latency by endpoint (no traffic produces gaps)
 sum by (uri, method) (rate(http_server_requests_seconds_sum{application="SpringMetric",uri!~"/actuator.*"}[5m]))
 /
 sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m]))
+
+# Estimated p99 duration per endpoint
+histogram_quantile(0.99, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket{application="SpringMetric",uri!~"/actuator.*"}[5m])))
 ```
+
+### Understanding the endpoint charts
+
+Restart the application to load the histogram settings. In Grafana, open
+**Dashboards > New > Import**, upload `monitoring/grafana/spring-metric.json`,
+select your existing Prometheus data source, and choose to overwrite the existing
+Spring Metric dashboard when prompted. The file keeps the same dashboard UID.
+Existing charts do not update automatically when a file in this repository changes.
+No Prometheus configuration change is needed if it already collects this app.
+
+The endpoint charts group measurements by HTTP method and route, combining all
+application instances and response statuses. Management requests are excluded.
+
+| Chart | Meaning | Example |
+| --- | --- | --- |
+| Requests per second | Average completed request rate over the last 5 minutes | `2 req/s` means about 2 requests complete each second |
+| Server error percentage | HTTP 5xx responses divided by all responses for that route | `10%` means 1 in 10 requests returned a server error |
+| Average endpoint latency | Total request duration divided by request count | Averages can hide a few very slow requests |
+| p99 endpoint latency | Estimated duration within which 99% of requests completed over the last 5 minutes | `500 ms` means approximately 1% took longer |
+
+PromQL is Prometheus's query language. `rate(counter[5m])` converts a cumulative
+counter into an average per-second increase over 5 minutes and handles counter
+resets after application restarts. The error query uses the request series to
+provide zero when no 5xx series exists. Grafana's percentage unit displays a
+fraction of `0.1` as `10%`. HTTP 4xx responses are client errors and are excluded
+from the server error numerator, but included in total traffic and latency.
+
+A histogram stores cumulative counts in duration ranges called buckets. The
+`le` label means "less than or equal to" that duration, in seconds. The p99 query
+adds bucket rates across instances and statuses, keeping `le`, route, and method,
+then estimates the percentile. Do not average independently computed p99 values
+across instances; combine their buckets first.
+
+The configured finite bucket range is **1 ms to 5 s**, a starting assumption for
+this small API. These are measurement settings, not request timeouts: faster and
+slower requests still contribute to the total count and duration. A final
+`+Inf` bucket counts all requests. Percentiles are approximate, especially near
+the range boundaries; if the p99 lies above the finite range, Prometheus reports
+the highest finite boundary (5 s), which can understate the real latency. Expand
+the range if real traffic requires it. Sub-millisecond latency is also estimated
+coarsely. Histograms are disabled for the separate in-progress request timer.
+
+Each bucket adds a stored time series for each combination of metric labels.
+Restricting histogram configuration to completed HTTP requests and bounding the
+range limits this cost. No client-side percentile calculation or new executor
+is added. Actual runtime overhead has not been benchmarked.
+
+### Generate local traffic
+
+With the application running, execute this in a second PowerShell window:
+
+```powershell
+1..120 | ForEach-Object {
+    Invoke-RestMethod http://localhost:8080/api/hello | Out-Null
+    Start-Sleep -Milliseconds 500
+}
+```
+
+This sends roughly 2 requests per second for about a minute (requests add some
+time). Watch Grafana while it runs. Allow at least two Prometheus collections
+(about 30 seconds at the example 15-second interval). The 5-minute average smooths
+changes, so it will not always display exactly `2 req/s`. Use **Last 15 minutes**
+and refresh the dashboard. The hello endpoint should show 0% server errors.
+No recent requests means latency and error percentage are undefined and appear
+as gaps; low traffic makes p99 statistically noisy. This exercise confirms the
+monitoring path, not production load capacity.
+
+The dashboard queries also have deterministic tests using artificial request
+and duration data, including 10% server errors, two instances, healthy traffic,
+and no traffic. These avoid adding deliberate delays or failure routes to the API:
+
+```powershell
+Get-Content -Raw monitoring/endpoint-queries.test.yml | docker exec -i prometheus promtool test rules /dev/stdin
+```
+
+These tests use Prometheus's query test facility; they do not change the running
+Prometheus configuration or stored metrics.
 
 Future metrics should use injected Micrometer meters with bounded label values.
 Do not label metrics with request IDs, user IDs, or raw URLs. Bind database pool

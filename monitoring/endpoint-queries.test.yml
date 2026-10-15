@@ -1,0 +1,125 @@
+evaluation_interval: 1m
+tests:
+  - name: healthy
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="0.001"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="0.1"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="5.0"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="+Inf"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="0.001"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="0.1"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="5.0"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="+Inf"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",uri="/actuator/prometheus",method="GET",status="200"}'
+        values: '0+600x5'
+    promql_expr_test:
+      - expr: 'sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m]))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{method="GET",uri="/api/hello"}'
+            value: 2
+      - expr: '(sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",status=~"5..",uri!~"/actuator.*"}[5m])) or on (uri, method) (0 * sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m])))) / sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m]))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{method="GET",uri="/api/hello"}'
+            value: 0
+      - expr: 'histogram_quantile(0.99, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket{application="SpringMetric",uri!~"/actuator.*"}[5m])))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{method="GET",uri="/api/hello"}'
+            value: 0.09901
+  - name: serverErrors
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200"}'
+        values: '0+54x5'
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="500"}'
+        values: '0+6x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="0.001"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="0.1"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="5.0"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="+Inf"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200"}'
+        values: '0+54x5'
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="500"}'
+        values: '0+6x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="0.001"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="0.1"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="5.0"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="+Inf"}'
+        values: '0+60x5'
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",uri="/actuator/prometheus",method="GET",status="200"}'
+        values: '0+600x5'
+    promql_expr_test:
+      - expr: 'sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m]))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{method="GET",uri="/api/hello"}'
+            value: 2
+      - expr: '(sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",status=~"5..",uri!~"/actuator.*"}[5m])) or on (uri, method) (0 * sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m])))) / sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m]))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{method="GET",uri="/api/hello"}'
+            value: 0.1
+      - expr: 'histogram_quantile(0.99, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket{application="SpringMetric",uri!~"/actuator.*"}[5m])))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{method="GET",uri="/api/hello"}'
+            value: 0.09901
+  - name: idle
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="0.001"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="0.1"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="5.0"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="a",uri="/api/hello",method="GET",status="200",le="+Inf"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="0.001"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="0.1"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="5.0"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_bucket{application="SpringMetric",instance="b",uri="/api/hello",method="GET",status="200",le="+Inf"}'
+        values: '0+0x5'
+      - series: 'http_server_requests_seconds_count{application="SpringMetric",uri="/actuator/prometheus",method="GET",status="200"}'
+        values: '0+600x5'
+    promql_expr_test:
+      - expr: 'sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m]))'
+        eval_time: 5m
+        exp_samples:
+          - labels: '{method="GET",uri="/api/hello"}'
+            value: 0
+      - expr: '((sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",status=~"5..",uri!~"/actuator.*"}[5m])) or on (uri, method) (0 * sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m])))) / sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m]))) == ((sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",status=~"5..",uri!~"/actuator.*"}[5m])) or on (uri, method) (0 * sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m])))) / sum by (uri, method) (rate(http_server_requests_seconds_count{application="SpringMetric",uri!~"/actuator.*"}[5m])))'
+        eval_time: 5m
+        exp_samples: []
+      - expr: '(histogram_quantile(0.99, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket{application="SpringMetric",uri!~"/actuator.*"}[5m])))) == (histogram_quantile(0.99, sum by (le, uri, method) (rate(http_server_requests_seconds_bucket{application="SpringMetric",uri!~"/actuator.*"}[5m]))))'
+        eval_time: 5m
+        exp_samples: []
