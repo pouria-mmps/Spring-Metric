@@ -1,0 +1,9 @@
+# Standalone example. Merge this job into your existing scrape_configs.
+scrape_configs:
+  - job_name: spring-metric
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    metrics_path: /actuator/prometheus
+    static_configs:
+      # Spring Boot runs on Windows; Prometheus runs in Docker Desktop.
+      - targets: ['host.docker.internal:8080']

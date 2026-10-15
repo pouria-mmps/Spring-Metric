@@ -1,0 +1,267 @@
+{
+    "__inputs":  [
+                     {
+                         "label":  "Prometheus",
+                         "pluginId":  "prometheus",
+                         "name":  "DS_PROMETHEUS",
+                         "pluginName":  "Prometheus",
+                         "type":  "datasource"
+                     }
+                 ],
+    "schemaVersion":  39,
+    "version":  1,
+    "panels":  [
+                   {
+                       "id":  1,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "short"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  0,
+                                       "w":  12,
+                                       "x":  0,
+                                       "h":  8
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{method}} {{uri}}",
+                                           "expr":  "up{job=\"spring-metric\"}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Application reachable"
+                   },
+                   {
+                       "id":  2,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percentunit"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  0,
+                                       "w":  12,
+                                       "x":  12,
+                                       "h":  8
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{method}} {{uri}}",
+                                           "expr":  "process_cpu_usage{application=\"SpringMetric\"}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Process CPU utilization"
+                   },
+                   {
+                       "id":  3,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "bytes"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  8,
+                                       "w":  12,
+                                       "x":  0,
+                                       "h":  8
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{method}} {{uri}}",
+                                           "expr":  "sum by (instance) (jvm_memory_used_bytes{application=\"SpringMetric\",area=\"heap\"})",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "JVM heap used"
+                   },
+                   {
+                       "id":  4,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "short"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  8,
+                                       "w":  12,
+                                       "x":  12,
+                                       "h":  8
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{method}} {{uri}}",
+                                           "expr":  "jvm_threads_live_threads{application=\"SpringMetric\"}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Live JVM threads"
+                   },
+                   {
+                       "id":  5,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "reqps"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  16,
+                                       "w":  12,
+                                       "x":  0,
+                                       "h":  8
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{method}} {{uri}}",
+                                           "expr":  "sum by (uri, method) (rate(http_server_requests_seconds_count{application=\"SpringMetric\",uri!~\"/actuator.*\"}[5m]))",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Requests per second by endpoint"
+                   },
+                   {
+                       "id":  6,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "s"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  16,
+                                       "w":  12,
+                                       "x":  12,
+                                       "h":  8
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{method}} {{uri}}",
+                                           "expr":  "sum by (uri, method) (rate(http_server_requests_seconds_sum{application=\"SpringMetric\",uri!~\"/actuator.*\"}[5m])) / sum by (uri, method) (rate(http_server_requests_seconds_count{application=\"SpringMetric\",uri!~\"/actuator.*\"}[5m]))",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Average endpoint latency"
+                   },
+                   {
+                       "id":  7,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "reqps"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  24,
+                                       "w":  12,
+                                       "x":  0,
+                                       "h":  8
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{method}} {{uri}}",
+                                           "expr":  "sum by (instance) (rate(http_server_requests_seconds_count{application=\"SpringMetric\",status=~\"5..\",uri!~\"/actuator.*\"}[5m]))",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "HTTP 5xx responses per second"
+                   },
+                   {
+                       "id":  8,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "s"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  24,
+                                       "w":  12,
+                                       "x":  12,
+                                       "h":  8
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{method}} {{uri}}",
+                                           "expr":  "sum by (instance) (rate(jvm_gc_pause_seconds_sum{application=\"SpringMetric\"}[5m]))",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "GC pause time per second"
+                   }
+               ],
+    "tags":  [
+                 "spring-boot",
+                 "micrometer"
+             ],
+    "time":  {
+                 "to":  "now",
+                 "from":  "now-30m"
+             },
+    "timezone":  "browser",
+    "refresh":  "15s",
+    "title":  "Spring Metric - Baseline",
+    "uid":  "spring-metric-baseline"
+}
