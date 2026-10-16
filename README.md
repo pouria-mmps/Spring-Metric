@@ -29,11 +29,33 @@ On Linux or macOS, use `./mvnw` instead of `.\mvnw.cmd`.
 
 ## Run
 
+Start Docker Desktop first. In the same PowerShell window used to run the app,
+enter a local database password without putting it in source files or shell history:
+
+```powershell
+$credential = Get-Credential -UserName springmetric -Message 'Choose the local PostgreSQL password'
+$env:DB_PASSWORD = $credential.GetNetworkCredential().Password
+docker compose -f monitoring/docker-compose.yaml up -d --wait postgres
+```
+
+This starts only PostgreSQL and does not replace existing Prometheus/Grafana
+containers. PostgreSQL listens on `127.0.0.1:5432` and persists data in a named
+Docker volume. The app runs on Windows, outside Docker. Use the same password
+on subsequent starts; changing the environment variable does not change the
+password in an already initialized database volume.
+
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
 The application listens on port 8080 by default.
+PostgreSQL must be available at startup. Flyway applies versioned SQL migrations;
+Hibernate validates the schema rather than changing it. `DB_URL` defaults to
+`jdbc:postgresql://localhost:5432/springmetric`, `DB_USERNAME` defaults to
+`springmetric`, and `DB_PASSWORD` is required. Do not commit database passwords.
+For local development the PostgreSQL role owns the database; use separate migration
+and application roles before production. Stop just PostgreSQL with
+`docker compose -f monitoring/docker-compose.yaml stop postgres`; its data remains.
 
 ## REST API
 
@@ -49,12 +71,45 @@ Try it in PowerShell:
 Invoke-RestMethod http://localhost:8080/api/hello
 ```
 
+### Database-backed tasks
+
+With PostgreSQL and the application running, open
+[Swagger UI](http://localhost:8080/swagger-ui.html) to call endpoints in your browser.
+Expand **POST /api/tasks**, select **Try it out**, enter
+`{"title":"Learn connection pools"}`, then select **Execute**.
+Copy the returned `id`, expand **GET /api/tasks/{id}**, select **Try it out**,
+enter the ID and select **Execute**. You can also call **GET /api/hello**.
+
+The generated OpenAPI JSON is available at `/v3/api-docs`. Only `/api/**`
+routes are documented. Swagger is enabled for this local learning setup; to
+disable it in another environment, set both `SPRINGDOC_API_DOCS_ENABLED=false`
+and `SPRINGDOC_SWAGGER_UI_ENABLED=false`.
+
+`POST /api/tasks` accepts `{"title":"Learn connection pools"}` and returns
+HTTP 201 with an `id`, the title, and a `Location: /api/tasks/{id}` header.
+`GET /api/tasks/{id}` returns that task, or HTTP 404 if it does not exist.
+Titles must be nonblank and at most 200 characters; invalid requests return 400.
+Titles are stored as supplied, and duplicate titles are allowed. Repeated POSTs
+create separate tasks; this API has no idempotency guarantee or authentication
+and is intended for local learning.
+
+```powershell
+$task = Invoke-RestMethod http://localhost:8080/api/tasks -Method Post -ContentType 'application/json' -Body '{"title":"Learn connection pools"}'
+Invoke-RestMethod "http://localhost:8080/api/tasks/$($task.id)"
+```
+
+Controllers use request/response DTOs, never JPA entities. Service methods define
+short database transactions: create commits before returning to the controller,
+and lookup uses a read-only transaction. No network calls or retries occur inside
+these transactions. Database constraints protect non-null, nonblank, bounded titles.
+
 ## Monitoring with existing Prometheus and Grafana
 
 Actuator and Micrometer expose JVM memory, garbage collection, threads, process CPU,
 uptime, disk space, and HTTP request counts and durations. HTTP series appear after
 requests are handled. Completed HTTP request duration histograms are enabled for
-endpoint p99 estimates. Database, Kafka, and custom business metrics are not yet configured.
+endpoint p99 estimates. HikariCP database connection-pool metrics are also exposed.
+Kafka and custom business metrics are not yet configured.
 
 Metrics are aggregated in memory and exported when Prometheus scrapes the app.
 There is no outbound monitoring call on the request path. Instrumentation and
@@ -190,7 +245,56 @@ Get-Content -Raw monitoring/endpoint-queries.test.yml | docker exec -i prometheu
 These tests use Prometheus's query test facility; they do not change the running
 Prometheus configuration or stored metrics.
 
+### Database connection-pool dashboard
+
+A connection pool reuses open database connections. A request borrows a connection,
+uses it for database work, then returns it. This application allows **5 connections**,
+keeps at least **1 idle**, and waits up to **3 seconds** to borrow one. That wait
+limit is not a SQL query timeout. These are learning defaults, not measured sizing.
+
+1. Start PostgreSQL and restart the app using the steps above.
+2. Create and retrieve a task to confirm database activity.
+3. Open `http://localhost:8080/actuator/prometheus` and search for `hikaricp_connections`.
+4. Confirm the existing `spring-metric` target is UP in Prometheus. No extra scrape
+   job or PostgreSQL exporter is needed for application connection-pool metrics.
+5. In Grafana, choose **Dashboards > New > Import**, upload
+   [monitoring/grafana/database-pool.json](monitoring/grafana/database-pool.json),
+   select your Prometheus data source, and import. This is a separate dashboard;
+   the existing HTTP/JVM dashboard remains available.
+6. Select **Last 15 minutes**, enable refresh, and allow at least two scrapes.
+
+| Panel | Interpretation |
+| --- | --- |
+| Connections in use | Connections currently borrowed by the app |
+| Idle connections | Open connections available to borrow |
+| Requests waiting for a connection | Threads waiting because no connection is available |
+| Maximum pool size | Configured limit, currently 5 |
+| Average time to obtain a connection | Average borrow wait over 5 minutes, not SQL execution time |
+| Connection timeouts per second | Rate of failed connection acquisitions after the wait limit |
+
+For a small fast API, active and waiting counts will often be zero at scrape time.
+Prometheus collects snapshots; it can miss brief activity between scrapes. The
+acquisition timer still records borrowing events. A zero-traffic timer average can
+show gaps. Sustained waiting, timeouts, or active connections near the maximum
+suggest contention; investigate slow queries and transaction duration before
+increasing the pool. These metrics do not measure PostgreSQL CPU, locks, or individual SQL timings.
+
+To generate read traffic without creating many rows:
+
+```powershell
+1..120 | ForEach-Object {
+    Invoke-RestMethod "http://localhost:8080/api/tasks/$($task.id)" | Out-Null
+    Start-Sleep -Milliseconds 500
+}
+```
+
+The Maven tests use H2 in PostgreSQL compatibility mode, the real migration, JPA,
+and HikariCP. They require no Docker and do not prove PostgreSQL compatibility.
+For a PostgreSQL smoke check, create a task, restart the application, then retrieve
+the same ID and confirm health remains UP. Docker/PostgreSQL and Grafana runtime
+verification are pending if Docker Desktop is unavailable.
+
 Future metrics should use injected Micrometer meters with bounded label values.
-Do not label metrics with request IDs, user IDs, or raw URLs. Bind database pool
-and Kafka client metrics when those components exist; avoid a custom exporter,
+Do not label metrics with request IDs, user IDs, or raw URLs. Add Kafka client
+metrics when Kafka exists; avoid a custom exporter,
 executor, or wrapper framework until a concrete requirement justifies one.

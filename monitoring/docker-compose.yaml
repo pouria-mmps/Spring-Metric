@@ -1,5 +1,23 @@
 
 services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: springmetric
+      POSTGRES_USER: springmetric
+      POSTGRES_PASSWORD: springmetric
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U springmetric -d springmetric"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -22,5 +40,6 @@ services:
       - prometheus
 
 volumes:
+  postgres_data:
   prometheus_data:
   grafana_data:

@@ -1,0 +1,213 @@
+{
+    "__inputs":  [
+                     {
+                         "label":  "Prometheus",
+                         "pluginId":  "prometheus",
+                         "name":  "DS_PROMETHEUS",
+                         "pluginName":  "Prometheus",
+                         "type":  "datasource"
+                     }
+                 ],
+    "schemaVersion":  39,
+    "version":  1,
+    "panels":  [
+                   {
+                       "id":  1,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "min":  0,
+                                                            "unit":  "short"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  0,
+                                       "w":  12,
+                                       "h":  8,
+                                       "x":  0
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{pool}}",
+                                           "expr":  "hikaricp_connections_active{application=\"SpringMetric\"}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Connections in use"
+                   },
+                   {
+                       "id":  2,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "min":  0,
+                                                            "unit":  "short"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  0,
+                                       "w":  12,
+                                       "h":  8,
+                                       "x":  12
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{pool}}",
+                                           "expr":  "hikaricp_connections_idle{application=\"SpringMetric\"}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Idle connections"
+                   },
+                   {
+                       "id":  3,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "min":  0,
+                                                            "unit":  "short"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  8,
+                                       "w":  12,
+                                       "h":  8,
+                                       "x":  0
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{pool}}",
+                                           "expr":  "hikaricp_connections_pending{application=\"SpringMetric\"}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Requests waiting for a connection"
+                   },
+                   {
+                       "id":  4,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "min":  0,
+                                                            "unit":  "short"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  8,
+                                       "w":  12,
+                                       "h":  8,
+                                       "x":  12
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{pool}}",
+                                           "expr":  "hikaricp_connections_max{application=\"SpringMetric\"}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Maximum pool size"
+                   },
+                   {
+                       "id":  5,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "min":  0,
+                                                            "unit":  "s"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  16,
+                                       "w":  12,
+                                       "h":  8,
+                                       "x":  0
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{pool}}",
+                                           "expr":  "rate(hikaricp_connections_acquire_seconds_sum{application=\"SpringMetric\"}[5m]) / rate(hikaricp_connections_acquire_seconds_count{application=\"SpringMetric\"}[5m])",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Average time to obtain a connection"
+                   },
+                   {
+                       "id":  6,
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "min":  0,
+                                                            "unit":  "ops"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "y":  16,
+                                       "w":  12,
+                                       "h":  8,
+                                       "x":  12
+                                   },
+                       "targets":  [
+                                       {
+                                           "legendFormat":  "{{instance}} {{pool}}",
+                                           "expr":  "rate(hikaricp_connections_timeout_total{application=\"SpringMetric\"}[5m])",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "${DS_PROMETHEUS}"
+                                      },
+                       "type":  "timeseries",
+                       "title":  "Connection timeouts per second"
+                   }
+               ],
+    "tags":  [
+                 "spring-boot",
+                 "hikari"
+             ],
+    "time":  {
+                 "to":  "now",
+                 "from":  "now-15m"
+             },
+    "timezone":  "browser",
+    "refresh":  "15s",
+    "title":  "Spring Metric - Database Pool",
+    "uid":  "spring-metric-database"
+}
