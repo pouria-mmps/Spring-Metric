@@ -2,6 +2,9 @@
 
 Minimal REST API using Spring Boot 4.1.1 and Java 25.
 
+For development history, decisions, verification results, and where to resume,
+read [PROJECT_HANDOFF.md](PROJECT_HANDOFF.md).
+
 ## Prerequisites
 
 Install JDK 25 and set `JAVA_HOME` to its installation directory. Maven is downloaded
