@@ -40,7 +40,7 @@ docker compose -f monitoring/docker-compose.yaml up -d --wait postgres
 
 This starts only PostgreSQL and does not replace existing Prometheus/Grafana
 containers. PostgreSQL listens on `127.0.0.1:5432` and persists data in a named
-Docker volume. The app runs on Windows, outside Docker. Use the same password
+Docker volume. The app runs on the host, outside Docker. Use the same password
 on subsequent starts; changing the environment variable does not change the
 password in an already initialized database volume.
 
@@ -48,7 +48,7 @@ password in an already initialized database volume.
 .\mvnw.cmd spring-boot:run
 ```
 
-The application listens on port 8080 by default.
+The application listens on port 8081 by default.
 PostgreSQL must be available at startup. Flyway applies versioned SQL migrations;
 Hibernate validates the schema rather than changing it. `DB_URL` defaults to
 `jdbc:postgresql://localhost:5432/springmetric`, `DB_USERNAME` defaults to
@@ -59,7 +59,7 @@ and application roles before production. Stop just PostgreSQL with
 
 ## REST API
 
-`GET http://localhost:8080/api/hello` returns HTTP 200 with JSON:
+`GET http://localhost:8081/api/hello` returns HTTP 200 with JSON:
 
 ```json
 {"message":"Hello, world!"}
@@ -68,13 +68,13 @@ and application roles before production. Stop just PostgreSQL with
 Try it in PowerShell:
 
 ```powershell
-Invoke-RestMethod http://localhost:8080/api/hello
+Invoke-RestMethod http://localhost:8081/api/hello
 ```
 
 ### Database-backed tasks
 
 With PostgreSQL and the application running, open
-[Swagger UI](http://localhost:8080/swagger-ui.html) to call endpoints in your browser.
+[Swagger UI](http://localhost:8081/swagger-ui.html) to call endpoints in your browser.
 Expand **POST /api/tasks**, select **Try it out**, enter
 `{"title":"Learn connection pools"}`, then select **Execute**.
 Copy the returned `id`, expand **GET /api/tasks/{id}**, select **Try it out**,
@@ -94,8 +94,8 @@ create separate tasks; this API has no idempotency guarantee or authentication
 and is intended for local learning.
 
 ```powershell
-$task = Invoke-RestMethod http://localhost:8080/api/tasks -Method Post -ContentType 'application/json' -Body '{"title":"Learn connection pools"}'
-Invoke-RestMethod "http://localhost:8080/api/tasks/$($task.id)"
+$task = Invoke-RestMethod http://localhost:8081/api/tasks -Method Post -ContentType 'application/json' -Body '{"title":"Learn connection pools"}'
+Invoke-RestMethod "http://localhost:8081/api/tasks/$($task.id)"
 ```
 
 Controllers use request/response DTOs, never JPA entities. Service methods define
@@ -115,9 +115,9 @@ Metrics are aggregated in memory and exported when Prometheus scrapes the app.
 There is no outbound monitoring call on the request path. Instrumentation and
 scraping still consume CPU and memory; overhead has not been benchmarked.
 
-1. Run the application on Windows using the command above.
-2. Open `http://localhost:8080/actuator/health` and
-   `http://localhost:8080/actuator/prometheus` to check the endpoints.
+1. Run the application on the host using the command above.
+2. Open `http://localhost:8081/actuator/health` and
+   `http://localhost:8081/actuator/prometheus` to check the endpoints.
 3. Merge the `spring-metric` job from [monitoring/prometheus.yml](monitoring/prometheus.yml)
    into the configuration mounted by your existing Prometheus container. Preserve
    other jobs and global settings. Validate the complete file with `promtool check config`
@@ -134,13 +134,27 @@ scraping still consume CPU and memory; overhead has not been benchmarked.
    using Grafana's dashboard import screen and select your Prometheus data source.
    Send traffic to `/api/hello`; rate panels need at least two scrapes.
 
-Prometheus runs in Docker Desktop, so its scrape target is
-`host.docker.internal:8080`, which resolves to the Windows host. Ensure Windows
-Firewall allows the container to reach this port. If the application later runs
-in Docker, use its service name on a shared network instead.
+Prometheus runs in Docker and scrapes `host.docker.internal:8081` to reach the
+application on the host. The Compose service explicitly maps this hostname using
+`host-gateway`, which supports the Linux Docker Engine setup. Docker Desktop on
+Windows normally provides this hostname automatically. Ensure the host firewall
+allows the container to reach port 8081. If the application later runs in Docker,
+use its service name on a shared network instead.
+
+After adding or changing the Compose host mapping, recreate only Prometheus:
+
+```bash
+docker compose -f monitoring/docker-compose.yaml up -d --no-deps --force-recreate prometheus
+```
+
+A container restart alone does not apply changed Compose host mappings. If a
+scrape error mentions `127.0.0.1:8081`, Prometheus is attempting to connect to its
+own container. Check the mapping with `docker exec prometheus cat /etc/hosts`.
+First confirm `http://localhost:8081/actuator/prometheus` responds on the host,
+then check the target in Prometheus after a scrape interval.
 
 Only `health` and `prometheus` are exposed over HTTP. They share application port
-8080 and are unauthenticated in this local setup. Before deploying outside a
+8081 and are unauthenticated in this local setup. Before deploying outside a
 trusted development network, restrict management access through network policy
 or authentication; do not publicly expose the metrics endpoint.
 
@@ -220,7 +234,7 @@ With the application running, execute this in a second PowerShell window:
 
 ```powershell
 1..120 | ForEach-Object {
-    Invoke-RestMethod http://localhost:8080/api/hello | Out-Null
+    Invoke-RestMethod http://localhost:8081/api/hello | Out-Null
     Start-Sleep -Milliseconds 500
 }
 ```
@@ -254,7 +268,7 @@ limit is not a SQL query timeout. These are learning defaults, not measured sizi
 
 1. Start PostgreSQL and restart the app using the steps above.
 2. Create and retrieve a task to confirm database activity.
-3. Open `http://localhost:8080/actuator/prometheus` and search for `hikaricp_connections`.
+3. Open `http://localhost:8081/actuator/prometheus` and search for `hikaricp_connections`.
 4. Confirm the existing `spring-metric` target is UP in Prometheus. No extra scrape
    job or PostgreSQL exporter is needed for application connection-pool metrics.
 5. In Grafana, choose **Dashboards > New > Import**, upload
@@ -283,7 +297,7 @@ To generate read traffic without creating many rows:
 
 ```powershell
 1..120 | ForEach-Object {
-    Invoke-RestMethod "http://localhost:8080/api/tasks/$($task.id)" | Out-Null
+    Invoke-RestMethod "http://localhost:8081/api/tasks/$($task.id)" | Out-Null
     Start-Sleep -Milliseconds 500
 }
 ```

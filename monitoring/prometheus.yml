@@ -5,5 +5,5 @@ scrape_configs:
     scrape_timeout: 10s
     metrics_path: /actuator/prometheus
     static_configs:
-      # Spring Boot runs on Windows; Prometheus runs in Docker Desktop.
-      - targets: ['host.docker.internal:8080']
+      # Spring Boot runs on the host; Compose maps this hostname to the host gateway.
+      - targets: ['host.docker.internal:8081']
